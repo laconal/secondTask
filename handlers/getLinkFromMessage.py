@@ -8,11 +8,12 @@ from aiogram.enums import ParseMode
 from database.LocalDB import addURL
 from keyboards.home import build_home
 from typing import List
+from config import BOT_TOKEN
 import re
 
 r = Router()
 
-bot = Bot('7846532519:AAGzL7gmjSlgJyiikqQL177ujUtPDoFrhDs')
+bot = Bot(BOT_TOKEN)
 
 class MessageFromUser(StatesGroup):
     gettingText = State()

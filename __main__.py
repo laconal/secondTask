@@ -6,9 +6,10 @@ from handlers import (getLinkFromMessage, getUserLinks,
                       userLinks, deleteAllLinks, userLinksChanging,
                       getNotionAPI)
 from keyboards import home
+from config import BOT_TOKEN
 
 async def main():
-    bot = Bot(token = '')
+    bot = Bot(token = BOT_TOKEN)
     dp = Dispatcher()
     dp.include_routers(getLinkFromMessage.r, home.r, userLinks.r, deleteAllLinks.r,
                        getUserLinks.r, userLinksChanging.r, getNotionAPI.r)
