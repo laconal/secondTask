@@ -9,30 +9,30 @@ engine = create_engine("sqlite:///tables.db")
 
 metadata = MetaData()
 
-table = Table(
-    "NotionUsers", metadata,
-    Column("ID", Integer, primary_key = True, autoincrement = True),
-    Column("userID", BigInteger, unique = True),
-    Column("notionAPI", String, default = None),
-    Column("databaseID", String, default = None)
-)
+# table = Table(
+#     "NotionUsers", metadata,
+#     Column("ID", Integer, primary_key = True, autoincrement = True),
+#     Column("userID", BigInteger, unique = True),
+#     Column("notionAPI", String, default = None),
+#     Column("databaseID", String, default = None)
+# )
 
-metadata.create_all(engine)
+# metadata.create_all(engine)
 
 table = Table ("NotionUsers", metadata, autoload_with = engine)
 
 # check if user already have in NotionDB; also returns row if user exists
-async def getNotionRow(userID: int) -> Tuple[bool, Any]:
+async def getNotionRow(userID: int) -> Tuple[bool, dict]:
     with engine.connect() as connection:
         check = connection.execute(select(table).
                                    where(userID == userID))
-        result = check.fetchone()
+        result: dict = check.mappings().fetchone()
         connection.close()
         if result is not None:
-            return True, result
+            return True, dict(result)
         else: return False, None
 
-async def addNotionRow(userID: int, notionAPI: str, databaseID: str) -> bool:
+async def addUserToNotion(userID: int, notionAPI: str, databaseID: str) -> bool:
     with engine.connect() as connection:
         change = connection.execute(table.insert().values(
             userID = userID,

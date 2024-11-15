@@ -1,14 +1,13 @@
 from aiogram import Router, F, Bot
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import CommandStart, Command, CommandObject, StateFilter
+from aiogram.filters import StateFilter
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 from database.LocalDB import userLinksList, removeURL, getRow, change
+from database.NotionDB import getNotionRow, addRowToNotion
 from keyboards.home import build_home
-from .userLinks import previousMessage
-from typing import List
 from data.config import BOT_TOKEN
 
 r = Router()
@@ -21,17 +20,18 @@ class UserLinkAction(StatesGroup):
     changeCategory = State()
     changePriority = State()
 
-toChange: str = ''
-rowData: dict = {}
+toChange: str
+rowData: dict
+previousMessage: int
+userNotionValues: dict
 
 @r.callback_query(F.data.regexp(r"userLink_(\d*)_"))
 async def call_userLink(callback: CallbackQuery):
-    global previousMessage, rowData
+    global previousMessage, rowData, userNotionValues
     URL = callback.data.split('_') # [1] - URL ID, [2] - URL
-    rowInfo: dict = await getRow(int(URL[1]))
+    rowInfo: dict | bool = await getRow(int(URL[1]))
     if not rowInfo:
-        await bot.edit_message_reply_markup(chat_id = callback.message.chat.id, message_id = previousMessage,
-                                            reply_markup = None)
+        await callback.message.edit_reply_markup(reply_markup = None)
         builder = await build_home(callback.from_user.id)
         await callback.message.answer("Error occured while getting URL information",
                                       reply_markup = builder.as_markup())
@@ -41,10 +41,15 @@ async def call_userLink(callback: CallbackQuery):
                 InlineKeyboardButton(text = "Change title", callback_data = f"userLinkAction_{URL[1]}_changeTitle"),
                 InlineKeyboardButton(text = "Change category", callback_data = f"userLinkAction_{URL[1]}_changeCategory"),
                 InlineKeyboardButton(text = "Change priority", callback_data = f"userLinkAction_{URL[1]}_changePriority"),
-                InlineKeyboardButton(text = "Delete element", callback_data = f"userLinkAction_{URL[1]}_delete"),
-                InlineKeyboardButton(text = "Back to home", callback_data = "home"))
+                InlineKeyboardButton(text = "Delete element", callback_data = f"userLinkAction_{URL[1]}_delete"))
+        
+        checkIfUserHaveNotion = await getNotionRow(callback.from_user.id) # [0] - bool, [1] - row values (dict)
+        if checkIfUserHaveNotion[0] and not rowInfo["inNotion"]: # check if URL has not added in Notion
+            builder.add(InlineKeyboardButton(text = "Add to Notion", callback_data = f"userLinkAction_{URL[1]}_addToNotion"))
+            userNotionValues = checkIfUserHaveNotion[1].copy()
+        builder.row(InlineKeyboardButton(text = "Back to home", callback_data = "home"))
         builder.adjust(2)
-        await callback.message.edit_text(f'''Select action with URL <b>{rowInfo['Title']}</b>\n
+        message = await callback.message.edit_text(f'''Select action with URL <b>{rowInfo['Title']}</b>\n
         URL INFORMATION:
         URL: <b>{rowInfo['URL']}</b>
         Title: <b>{rowInfo['Title']}</b>
@@ -54,10 +59,11 @@ async def call_userLink(callback: CallbackQuery):
         Added time: <b>{rowInfo['timestamp']}</b>''', 
                                         reply_markup = builder.as_markup(), parse_mode = ParseMode.HTML)
         rowData = rowInfo.copy()
+        previousMessage = message.message_id
     
 @r.callback_query(F.data.regexp(r"userLinkAction_(\d*)_"))
 async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
-    global previousMessage, rowData, toChange
+    global previousMessage, rowData, toChange, userNotionValues
     action = callback.data.split('_') # [1] - URL ID, [2] - action
     if action[2] == "delete":
         builder = await build_home(callback.from_user.id)
@@ -66,7 +72,7 @@ async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
             await callback.message.edit_text("URL has successfully removed!", reply_markup = builder.as_markup())
         else:
             await callback.message.edit_text("Error occured while deleting URL", reply_markup = builder.as_markup())
-    elif action[2] in ["changeURL", "changeTitle", "changeCategory", "changePriority"]:
+    elif action[2] in ["changeURL", "changeTitle", "changeCategory", "changePriority", "addToNotion"]:
         builder = InlineKeyboardBuilder()
         builder.add(InlineKeyboardButton(text = "Cancel", callback_data = "home"))
         if action[2] == "changeURL":
@@ -93,12 +99,25 @@ async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
             previousMessage = callback.message.message_id
             await state.set_state(UserLinkAction.changePriority)
             toChange = "Priority"
+        elif action[2] == "addToNotion":
+            builder = await build_home(callback.from_user.id)
+            checkIfAdded = await addRowToNotion(rowData["ID"], rowData["userID"],
+                                                rowData["URL"], rowData["Source"],
+                                                userNotionValues["notionAPI"],
+                                                userNotionValues["databaseID"])
+            if checkIfAdded:
+                await callback.message.edit_text(f"{rowData['Title']} successfully added to Notion database",
+                                                 reply_markup = None)
+                await change(rowData["ID"], "inNotion", True)
+                await callback.message.answer("Select action", reply_markup = builder.as_markup())
+            else:
+                await callback.message.edit_text("Error occured while adding to Notion database")
+                await callback.message.answer("Select action", reply_markup = builder.as_markup())
 
 @r.message(StateFilter(UserLinkAction.changeURL, UserLinkAction.changeTitle,
                        UserLinkAction.changeCategory, UserLinkAction.changePriority))
 async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
     global previousMessage, rowData, toChange
-
     await bot.edit_message_reply_markup(chat_id = msg.chat.id, message_id = previousMessage,
             reply_markup = None)
     builder = await build_home(msg.from_user.id)

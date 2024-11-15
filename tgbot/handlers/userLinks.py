@@ -7,7 +7,6 @@ from database.LocalDB import userLinksList
 from keyboards.home import build_home
 from typing import List
 from data.config import BOT_TOKEN
-
 r = Router()
 
 bot = Bot(BOT_TOKEN)
@@ -18,11 +17,8 @@ class UserLinkAction(StatesGroup):
     changeCategory = State()
     changePriority = State()
 
-previousMessage: int = 0
-
 @r.callback_query(F.data == "myLinks")
 async def call_myLinks(callback: CallbackQuery):
-    global previousMessage
     links: List = await userLinksList(callback.from_user.id)
     if not links:
         builder = await build_home(callback.from_user.id)
@@ -41,5 +37,4 @@ async def call_myLinks(callback: CallbackQuery):
                                         callback_data = "getLinks_allLinks"))
         builder.adjust(2)
         await callback.message.edit_text("Select property", reply_markup = builder.as_markup())
-        previousMessage = callback.message.message_id
 

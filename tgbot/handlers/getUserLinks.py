@@ -6,8 +6,11 @@ from typing import List
 
 r = Router()
 
+previousMessage: int = 0
+
 @r.callback_query(F.data.regexp(r"getLinks_"))
 async def call_getLinks(callback: CallbackQuery):
+    global previousMessage
     byWhat = callback.data.split('_')[1]
     builder = InlineKeyboardBuilder()
     links: List = await userLinksList(callback.from_user.id)

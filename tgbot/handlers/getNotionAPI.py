@@ -6,7 +6,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 from keyboards.home import build_home
-from database.NotionDB import addNotionRow
+from database.NotionDB import addUserToNotion
 from typing import List
 import re
 from data.config import BOT_TOKEN
@@ -54,7 +54,7 @@ async def state_getDatabaseID(msg: Message, state: FSMContext):
     await bot.edit_message_reply_markup(chat_id = msg.chat.id, message_id = previousMessage, reply_markup = None)
     #### if 'builder' was defined here before IF ELSE statement, new menu will have 'Add Notion link', because here notion have not added yet
     notionValues.append(msg.text)
-    checkIfAdded = await addNotionRow(msg.from_user.id,
+    checkIfAdded = await addUserToNotion(msg.from_user.id,
                                       notionAPI = notionValues[0],
                                       databaseID = notionValues[1])
     if checkIfAdded:

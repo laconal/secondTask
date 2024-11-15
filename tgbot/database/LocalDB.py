@@ -1,5 +1,5 @@
 from sqlalchemy import (and_, create_engine, Table, Column, Integer, String, 
-                        MetaData, BigInteger, delete, update, DateTime, select)
+                        MetaData, BigInteger, delete, update, DateTime, select, Boolean)
 import asyncio
 from typing import List, Tuple, Union
 from bs4 import BeautifulSoup
@@ -11,21 +11,35 @@ engine = create_engine('sqlite:///tables.db')
 
 metadata = MetaData()
 
-table = Table(
-    "MessagesURL", metadata,
-    Column("ID", Integer, primary_key = True, autoincrement = True),
-    Column("userID", BigInteger),
-    Column("URL", String),
-    Column("Title", String, default = None),
-    Column("Source", String, default = None),
-    Column("Category", String),
-    Column("Priority", Integer, default = None),
-    Column("timestamp", DateTime)
-)
-metadata.create_all(engine)
 
+### comment about mappings(), if it gets one row (using fetchone) - it gets as SQLAlchemy object, not as dict or list
+### if gets more than one (using fetchall) - then object is list of dicts (even if gets one row)
+
+
+# table = Table(
+#     "MessagesURL", metadata,
+#     Column("ID", Integer, primary_key = True, autoincrement = True),
+#     Column("userID", BigInteger),
+#     Column("URL", String),
+#     Column("Title", String, default = None),
+#     Column("Source", String, default = None),
+#     Column("Category", String),
+#     Column("Priority", Integer, default = None),
+#     Column("inNotion", Boolean, default = False),
+#     Column("timestamp", DateTime)
+# )
+# metadata.create_all(engine)
 
 table = Table("MessagesURL", metadata, autoload_with = engine)
+
+### testing
+# from NotionDB import getNotionRow, addRowToNotion
+# with engine.connect() as conn:
+#     # q = conn.execute(table.select())
+#     q = conn.execute(table.select())
+#     result = q.mappings().fetchall()
+#     print(type(result))
+
 
 async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
     with engine.connect() as connection:
@@ -56,7 +70,12 @@ async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
             if notionCheck: # add URL to Notion
                 addedToNotion = await addRowToNotion(lastID, userID, URL, source,
                                                      notionValues[2], notionValues[3])
-                if addedToNotion: resultText = "Successfully saved in local and Notion database"
+                if addedToNotion: 
+                    resultText = "Successfully saved in local and Notion database"
+                    connection.execute(update(table).
+                                                where(table.c.ID == lastID).
+                                                values({"inNotion": True}))
+                    connection.commit()
             connection.close()
             return True, resultText
         else:
@@ -66,30 +85,12 @@ async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
 async def getRow(urlID: int) -> Union[dict, bool]:
     with engine.connect() as connection:
         global table
-        result = {}
         row = connection.execute(select(table).
                                  where(table.c.ID == urlID))
-        rowValues = row.fetchone()
-        if rowValues is None: return False
-        columns = table.columns.keys()
-        rowIterator = 0
-        for col in columns:
-            result[col] = rowValues[rowIterator] or "Not specified"
-            rowIterator += 1
+        result = row.mappings().fetchone()
+        if result is None: return False
         connection.close()
-        return result
-    
-async def getRows(rows, columns) -> List:
-    result = []
-    for row in rows:
-        rowIterator = 0
-        row_dict = {}
-        for col in columns:
-            row_dict[col] = row[rowIterator]
-            rowIterator += 1
-        result.append(row_dict)
-    return result
-
+        return dict(result)
 
 async def getRowsBy(userID: int, property: str, propertyValue: str | int = None) -> Union[List, bool]:
     global table
@@ -132,10 +133,8 @@ async def getRowsBy(userID: int, property: str, propertyValue: str | int = None)
                                         table.c.Priority == propertyValue
                                     )))
         
-        rowsValues = rows.fetchall()
-        if rowsValues is None: return False
-        columns = table.columns.keys()
-        result = await getRows(rowsValues, columns)
+        result = rows.mappings().fetchall()
+        if result is None: return False
         return result
 
 # get all rows with user ID
@@ -145,14 +144,12 @@ async def userLinksList(userID: int) -> Union[list, bool]:
         result = [] 
         rows = connection.execute(select(table).
                                   where(table.c.userID == userID))
-        values = rows.fetchall()
-        if not values: return False
-        columns = table.columns.keys()
-        result = await getRows(values, columns)
+        result = rows.mappings().fetchall()
+        if not result: return False
         connection.close()
         return result
 
-async def change(urlID: str, property: str, value: str | int) -> bool:
+async def change(ID: str, property: str, value: str | int | bool) -> bool:
     global table
     with engine.connect() as connection:
         if property == "URL":
@@ -169,16 +166,16 @@ async def change(urlID: str, property: str, value: str | int) -> bool:
 
             newValue = {property: value, "Title": title}
             check = connection.execute(update(table).
-                                    where(table.c.ID == urlID).
+                                    where(table.c.ID == ID).
                                     values(newValue))
             connection.commit()
             connection.close()
             if check.rowcount == 1: return True
             else: return False
-        elif property in ["Title", "Category", "Priority"]:
+        elif property in ["Title", "Category", "Priority", "inNotion"]:
             newValue = {property: value}
             check = connection.execute(update(table).
-                                    where(table.c.ID == urlID).
+                                    where(table.c.ID == ID).
                                     values(newValue))
             connection.commit()
             connection.close()
