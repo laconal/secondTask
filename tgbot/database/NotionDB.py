@@ -4,8 +4,9 @@ import requests
 import asyncio
 from datetime import datetime
 from typing import Union, Any, Tuple
+from data.config import defaultNotionAPI, databaseURL
 
-engine = create_engine("sqlite:///tables.db")
+engine = create_engine("sqlite:///../tables.db")
 
 metadata = MetaData()
 
@@ -45,9 +46,9 @@ async def addUserToNotion(userID: int, notionAPI: str, databaseID: str) -> bool:
         else: return False
 
 async def addRowToNotion(ID: int, userID: int, URL: str,
-                         Source: str, notionAPI: str, databaseID: str) -> bool:
+                         Source: str, notionAPI: str | None = None, databaseID: str | None = None) -> bool:
     headers = {
-        "Authorization": f"Bearer {notionAPI}",
+        "Authorization": f"Bearer {notionAPI or defaultNotionAPI}",
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
     }
@@ -56,7 +57,7 @@ async def addRowToNotion(ID: int, userID: int, URL: str,
 
     data = {
         "parent": {
-            "database_id": databaseID
+            "database_id": databaseID or databaseURL
         },
         "properties": {
             "ID": {

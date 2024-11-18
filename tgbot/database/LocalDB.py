@@ -7,7 +7,7 @@ import requests
 from datetime import datetime
 from database.NotionDB import getNotionRow, addRowToNotion
 
-engine = create_engine('sqlite:///tables.db')
+engine = create_engine('sqlite:///../tables.db')
 
 metadata = MetaData()
 
@@ -64,9 +64,14 @@ async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
         if check.rowcount == 1:
             resultText = "Successfully saved in local database"
             notionCheck, notionValues = await getNotionRow(userID)
-            # notionValues [2] - Notion API, [3] - Database ID
-
+            # user's notionValues: [2] - Notion API, [3] - Database ID
+            
             lastID = connection.execute(select(table).order_by(table.c.ID.desc()).limit(1)).fetchone()[0]
+
+            addToDefaultNotion = await addRowToNotion(lastID, userID, URL, source)
+            if addToDefaultNotion:
+                resultText = "Successfully save in local and default Notion databases"
+            # add to default Notion database
             if notionCheck: # add URL to Notion
                 addedToNotion = await addRowToNotion(lastID, userID, URL, source,
                                                      notionValues[2], notionValues[3])

@@ -6,7 +6,6 @@ from database.NotionDB import getNotionRow
 
 r = Router()
 
-
 async def build_home(userID: int = None) -> InlineKeyboardBuilder:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text = "Send link",

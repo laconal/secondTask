@@ -9,11 +9,9 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-# from tgbot import handlers
-# from tgbot.data import config
 import handlers
 import keyboards
-from data import config
+from data.config import botToken
 
 def setup_logging():
     log_level = logging.INFO
@@ -45,7 +43,7 @@ async def main():
     )
 
     bot = Bot(
-        token=config.BOT_TOKEN,
+        token=botToken,
         session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )

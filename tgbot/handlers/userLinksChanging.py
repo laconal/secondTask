@@ -8,11 +8,11 @@ from aiogram.enums import ParseMode
 from database.LocalDB import userLinksList, removeURL, getRow, change
 from database.NotionDB import getNotionRow, addRowToNotion
 from keyboards.home import build_home
-from data.config import BOT_TOKEN
+from data.config import botToken
 
 r = Router()
 
-bot = Bot(BOT_TOKEN)
+bot = Bot(botToken)
 
 class UserLinkAction(StatesGroup):
     changeURL = State()

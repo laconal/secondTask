@@ -6,10 +6,10 @@ from aiogram.enums import ParseMode
 from database.LocalDB import userLinksList
 from keyboards.home import build_home
 from typing import List
-from data.config import BOT_TOKEN
+from data.config import botToken
 r = Router()
 
-bot = Bot(BOT_TOKEN)
+bot = Bot(botToken)
 
 class UserLinkAction(StatesGroup):
     changeURL = State()

@@ -9,11 +9,11 @@ from keyboards.home import build_home
 from database.NotionDB import addUserToNotion
 from typing import List
 import re
-from data.config import BOT_TOKEN
+from data.config import botToken
 
 r = Router()
 
-bot = Bot(BOT_TOKEN)
+bot = Bot(botToken)
 
 class NotionFromUser(StatesGroup):
     API = State()
