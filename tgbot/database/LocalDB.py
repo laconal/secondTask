@@ -1,7 +1,6 @@
 from sqlalchemy import (and_, create_engine, Table, Column, Integer, String, 
                         MetaData, BigInteger, delete, update, DateTime, select, Boolean)
-import asyncio
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any
 from bs4 import BeautifulSoup
 import requests
 from datetime import datetime
@@ -16,19 +15,19 @@ metadata = MetaData()
 ### if gets more than one (using fetchall) - then object is list of dicts (even if gets one row)
 
 
-# table = Table(
-#     "MessagesURL", metadata,
-#     Column("ID", Integer, primary_key = True, autoincrement = True),
-#     Column("userID", BigInteger),
-#     Column("URL", String),
-#     Column("Title", String, default = None),
-#     Column("Source", String, default = None),
-#     Column("Category", String),
-#     Column("Priority", Integer, default = None),
-#     Column("inNotion", Boolean, default = False),
-#     Column("timestamp", DateTime)
-# )
-# metadata.create_all(engine)
+table = Table(
+    "MessagesURL", metadata,
+    Column("ID", Integer, primary_key = True, autoincrement = True),
+    Column("userID", BigInteger),
+    Column("URL", String),
+    Column("Title", String, default = None),
+    Column("Source", String, default = None),
+    Column("Category", String),
+    Column("Priority", Integer, default = None),
+    Column("inNotion", Boolean, default = False),
+    Column("timestamp", DateTime)
+)
+metadata.create_all(engine)
 
 table = Table("MessagesURL", metadata, autoload_with = engine)
 
@@ -58,7 +57,7 @@ async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
 
         check = connection.execute(
             table.insert().values(userID = userID, URL = URL,
-                                  Title = title, Source = source, timestamp = datetime.now())
+                                  Title = title, Source = source, inNotion = False, timestamp = datetime.now(),)
         )
         connection.commit()
         if check.rowcount == 1:
@@ -68,15 +67,15 @@ async def addURL(userID: int, URL: str, source: str) -> Tuple[bool, str]:
             
             lastID = connection.execute(select(table).order_by(table.c.ID.desc()).limit(1)).fetchone()[0]
 
-            addToDefaultNotion = await addRowToNotion(lastID, userID, URL, source)
-            if addToDefaultNotion:
-                resultText = "Successfully save in local and default Notion databases"
+            if await addRowToNotion(lastID, userID, URL, source):
+                resultText = "Successfully saveв in local and default Notion databases"
             # add to default Notion database
+
             if notionCheck: # add URL to Notion
                 addedToNotion = await addRowToNotion(lastID, userID, URL, source,
                                                      notionValues[2], notionValues[3])
                 if addedToNotion: 
-                    resultText = "Successfully saved in local and Notion database"
+                    resultText = "Successfully saved in local and  Notion (default and yours) database"
                     connection.execute(update(table).
                                                 where(table.c.ID == lastID).
                                                 values({"inNotion": True}))
@@ -97,10 +96,11 @@ async def getRow(urlID: int) -> Union[dict, bool]:
         connection.close()
         return dict(result)
 
-async def getRowsBy(userID: int, property: str, propertyValue: str | int = None) -> Union[List, bool]:
+async def getRowsBy(userID: int, property: str, propertyValue: str | int | bool = None) -> Union[List, bool]:
     global table
     with engine.connect() as connection:
         result = []
+        rows: Any
         if property == "Category":
             if propertyValue is None:
                 rows = connection.execute(select(table).
@@ -137,6 +137,12 @@ async def getRowsBy(userID: int, property: str, propertyValue: str | int = None)
                                         table.c.userID == userID,
                                         table.c.Priority == propertyValue
                                     )))
+        elif property == "inNotion":
+            rows = connection.execute(select(table).
+                                      where(and_(
+                                          table.c.userID == userID,
+                                          table.c.inNotion == propertyValue
+                                      )))
         
         result = rows.mappings().fetchall()
         if result is None: return False

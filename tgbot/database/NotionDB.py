@@ -10,15 +10,15 @@ engine = create_engine("sqlite:///../tables.db")
 
 metadata = MetaData()
 
-# table = Table(
-#     "NotionUsers", metadata,
-#     Column("ID", Integer, primary_key = True, autoincrement = True),
-#     Column("userID", BigInteger, unique = True),
-#     Column("notionAPI", String, default = None),
-#     Column("databaseID", String, default = None)
-# )
+table = Table(
+    "NotionUsers", metadata,
+    Column("ID", Integer, primary_key = True, autoincrement = True),
+    Column("userID", BigInteger, unique = True),
+    Column("notionAPI", String, default = None),
+    Column("databaseID", String, default = None)
+)
 
-# metadata.create_all(engine)
+metadata.create_all(engine)
 
 table = Table ("NotionUsers", metadata, autoload_with = engine)
 

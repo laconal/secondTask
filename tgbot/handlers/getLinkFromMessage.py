@@ -101,8 +101,8 @@ async def call_selectSaveLinks(callback: CallbackQuery):
     # check if need to save all URLs or not
     saveAll: bool = True if len(callbackData) == 3 and callbackData[1] == "All" else False
     if saveAll:
-        await callback.message.answer("Selected all")
-        await callback.message.edit_text("Processing...", reply_markup = None)
+        await callback.message.edit_text("Selected all", reply_markup = None)
+        await callback.message.answer("Processing...")
         builder = await build_home(callback.from_user.id)
         URLcounter = 0
         for text in URLsToSave:

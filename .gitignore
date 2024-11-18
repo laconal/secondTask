@@ -137,3 +137,6 @@ credentials.json
 .idea
 main.py
 cache
+
+# ignore file
+testing.py
