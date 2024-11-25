@@ -9,6 +9,7 @@ from database.LocalDB import addURL
 from keyboards.home import build_home
 from typing import List
 from data.config import botToken
+import asyncio
 import re
 
 r = Router()
@@ -18,23 +19,36 @@ bot = Bot(botToken)
 class MessageFromUser(StatesGroup):
     gettingText = State()
 
+asyncioTask: asyncio.Task
 previousMessage = 0
 URLsToSave: List = []
 usedLinks: List = []
 
+async def waitMessage(chatID, userID, state: FSMContext, timeout: int) -> None:
+    global previousMessage
+    await asyncio.sleep(timeout)
+    await state.clear()
+    builder = await build_home(userID)
+    await bot.edit_message_reply_markup(chat_id = chatID, message_id = previousMessage, reply_markup = None)
+    await bot.send_message(chatID, f"Time ({timeout} seconds) to get from you message is expired. Try again.",
+                           reply_markup = builder.as_markup())
+
 @r.callback_query(F.data == "sendLink")
 async def call_sendLink(callback: CallbackQuery, state: FSMContext):
-    global previousMessage
+    global previousMessage, asyncioTask
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text = "Back to home", 
                                      callback_data = "home"))
     await callback.message.edit_text(text = "Send your link", reply_markup = builder.as_markup())
     await state.set_state(MessageFromUser.gettingText)
+    asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id, state, 10))
     previousMessage = callback.message.message_id
 
 @r.message(MessageFromUser.gettingText)
 async def state_MessageFromUser(msg: Message, state: FSMContext):
-    global previousMessage, URLsToSave
+    global previousMessage, URLsToSave, asyncioTask
+    asyncioTask.cancel()
+    await state.clear()
     await bot.edit_message_reply_markup(chat_id = msg.chat.id, message_id = previousMessage,
                                         reply_markup = None)
     builder = await build_home(msg.from_user.id)
@@ -87,7 +101,6 @@ async def state_MessageFromUser(msg: Message, state: FSMContext):
         builder.row(InlineKeyboardButton(text = "Save all links", callback_data = f"selectSaveLinks_All_{msgSource}"))
         builder.row(InlineKeyboardButton(text = "Cancel", callback_data = "home"))
         await msg.answer("Which one save?", reply_markup = builder.as_markup())
-    await state.clear()
 
 @r.callback_query(F.data.regexp(r"selectSaveLinks_"))
 async def call_selectSaveLinks(callback: CallbackQuery):
