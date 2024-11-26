@@ -9,6 +9,7 @@ from database.LocalDB import userLinksList, removeURL, getRow, change
 from database.NotionDB import getNotionRow, addRowToNotion
 from keyboards.home import build_home
 from data.config import botToken
+import asyncio
 
 r = Router()
 
@@ -20,10 +21,20 @@ class UserLinkAction(StatesGroup):
     changeCategory = State()
     changePriority = State()
 
+asyncioTask: asyncio.Task
 toChange: str
 rowData: dict
 previousMessage: int
 userNotionValues: dict
+
+async def waitMessage(chatID, userID, state: FSMContext, timeout: int) -> None:
+    global previousMessage
+    await asyncio.sleep(timeout)
+    await state.clear()
+    builder = await build_home(userID)
+    await bot.edit_message_reply_markup(chat_id = chatID, message_id = previousMessage, reply_markup = None)
+    await bot.send_message(chatID, f"Time ({timeout} seconds) to get from you message is expired. Try again.",
+                           reply_markup = builder.as_markup())
 
 @r.callback_query(F.data.regexp(r"userLink_(\d*)_"))
 async def call_userLink(callback: CallbackQuery):
@@ -63,7 +74,7 @@ async def call_userLink(callback: CallbackQuery):
     
 @r.callback_query(F.data.regexp(r"userLinkAction_(\d*)_"))
 async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
-    global previousMessage, rowData, toChange, userNotionValues
+    global previousMessage, rowData, toChange, userNotionValues, asyncioTask
     action = callback.data.split('_') # [1] - URL ID, [2] - action
     if action[2] == "delete":
         builder = await build_home(callback.from_user.id)
@@ -81,24 +92,32 @@ async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
             previousMessage = callback.message.message_id
             await state.set_state(UserLinkAction.changeURL)
             toChange = "URL"
+            asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id,
+                                                          state, 10))
         elif action[2] == "changeTitle":
             await callback.message.edit_text(f"Send your new Title instead of {rowData['Title']}.", 
                                        reply_markup = builder.as_markup())
             previousMessage = callback.message.message_id
             await state.set_state(UserLinkAction.changeTitle)
             toChange = "Title"
+            asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id,
+                                                          state, 10))
         elif action[2] == "changeCategory":
             await callback.message.edit_text(f"Send your new Category instead of {rowData['Category']}.", 
                                        reply_markup = builder.as_markup())
             previousMessage = callback.message.message_id
             await state.set_state(UserLinkAction.changeCategory)
             toChange = "Category"
+            asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id,
+                                                          state, 10))
         elif action[2] == "changePriority":
             await callback.message.edit_text(f"Send your new Priority (number) instead of {rowData['Priority']}.", 
                                        reply_markup = builder.as_markup())
             previousMessage = callback.message.message_id
             await state.set_state(UserLinkAction.changePriority)
             toChange = "Priority"
+            asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id,
+                                                          state, 10))
         elif action[2] == "addToNotion":
             builder = await build_home(callback.from_user.id)
             checkIfAdded = await addRowToNotion(rowData["ID"], rowData["userID"],
@@ -117,7 +136,8 @@ async def call_userLinkAction(callback: CallbackQuery, state: FSMContext):
 @r.message(StateFilter(UserLinkAction.changeURL, UserLinkAction.changeTitle,
                        UserLinkAction.changeCategory, UserLinkAction.changePriority))
 async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
-    global previousMessage, rowData, toChange
+    global previousMessage, rowData, toChange, asyncioTask
+    asyncioTask.cancel()
     await bot.edit_message_reply_markup(chat_id = msg.chat.id, message_id = previousMessage,
             reply_markup = None)
     builder = await build_home(msg.from_user.id)
@@ -133,43 +153,35 @@ async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
         if checkIfChanged:
             await msg.answer(f"URL has been successfully changed to <b>{URL}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
         else: 
             await msg.answer("Error occured while changing URL")
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
     elif toChange == "Title":
         checkIfChanged = await change(urlID = rowData["ID"], property = "Title", value = msg.text)
         if checkIfChanged:
             await msg.answer(f"Title has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
         else: 
             await msg.answer("Error occured while changing Title")
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
     elif toChange == "Category":
         checkIfChanged = await change(urlID = rowData["ID"], property = "Category", value = msg.text)
         if checkIfChanged:
             await msg.answer(f"Category has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
         else: 
             await msg.answer("Error occured while changing Category")
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
     elif toChange == "Priority":
         if not msg.text.isdigit():
             await msg.answer("As priority can be used only digits, not characters")
             await msg.answer("Select action", reply_markup = builder.as_markup())
-            await state.clear()
         else:
             checkIfChanged = await change(urlID = rowData["ID"], property = "Priority", value = int(msg.text))
             if checkIfChanged:
                 await msg.answer(f"Priority has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
                 await msg.answer("Select action", reply_markup = builder.as_markup())
-                await state.clear()
+
             else: 
                 await msg.answer("Error occured while changing Priority")
                 await msg.answer("Select action", reply_markup = builder.as_markup())
-                await state.clear()

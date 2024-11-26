@@ -41,7 +41,8 @@ async def call_sendLink(callback: CallbackQuery, state: FSMContext):
                                      callback_data = "home"))
     await callback.message.edit_text(text = "Send your link", reply_markup = builder.as_markup())
     await state.set_state(MessageFromUser.gettingText)
-    asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id, state, 10))
+    asyncioTask = asyncio.create_task(waitMessage(callback.message.chat.id, callback.from_user.id, 
+                                                  state, 10))
     previousMessage = callback.message.message_id
 
 @r.message(MessageFromUser.gettingText)

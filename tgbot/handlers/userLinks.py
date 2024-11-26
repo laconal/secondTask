@@ -13,12 +13,6 @@ r = Router()
 
 bot = Bot(botToken)
 
-class UserLinkAction(StatesGroup):
-    changeURL = State()
-    changeTitle = State()
-    changeCategory = State()
-    changePriority = State()
-
 unsavedNotionURLs: List
 userNotionValues: dict
 
