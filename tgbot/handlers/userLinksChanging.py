@@ -149,7 +149,7 @@ async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
                 URL = item.extract_from(msg.text)
                 break
 
-        checkIfChanged = await change(urlID = rowData["ID"], property = "URL", value = URL)
+        checkIfChanged = await change(ID = rowData["ID"], property = "URL", value = URL)
         if checkIfChanged:
             await msg.answer(f"URL has been successfully changed to <b>{URL}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
@@ -157,7 +157,7 @@ async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
             await msg.answer("Error occured while changing URL")
             await msg.answer("Select action", reply_markup = builder.as_markup())
     elif toChange == "Title":
-        checkIfChanged = await change(urlID = rowData["ID"], property = "Title", value = msg.text)
+        checkIfChanged = await change(ID = rowData["ID"], property = "Title", value = msg.text)
         if checkIfChanged:
             await msg.answer(f"Title has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
@@ -165,7 +165,7 @@ async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
             await msg.answer("Error occured while changing Title")
             await msg.answer("Select action", reply_markup = builder.as_markup())
     elif toChange == "Category":
-        checkIfChanged = await change(urlID = rowData["ID"], property = "Category", value = msg.text)
+        checkIfChanged = await change(ID = rowData["ID"], property = "Category", value = msg.text)
         if checkIfChanged:
             await msg.answer(f"Category has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
             await msg.answer("Select action", reply_markup = builder.as_markup())
@@ -177,7 +177,7 @@ async def state_UserLinkAction_changeURL(msg: Message, state: FSMContext):
             await msg.answer("As priority can be used only digits, not characters")
             await msg.answer("Select action", reply_markup = builder.as_markup())
         else:
-            checkIfChanged = await change(urlID = rowData["ID"], property = "Priority", value = int(msg.text))
+            checkIfChanged = await change(ID = rowData["ID"], property = "Priority", value = int(msg.text))
             if checkIfChanged:
                 await msg.answer(f"Priority has been successfully changed to <b>{msg.text}</b>", parse_mode = ParseMode.HTML)
                 await msg.answer("Select action", reply_markup = builder.as_markup())
